@@ -1,0 +1,30 @@
+/*
+ * EEPROM Write
+ *
+ * These values will stay in the EEPROM when the board is
+ * turned off and may be retrieved later by another sketch.
+ */
+
+/** the current address in the EEPROM (i.e. which byte we're going to write to next) **/
+#include <EEPROM.h>
+
+
+// Initialise relevant values
+int addr = 0;
+int val = 8;
+
+
+// Setup
+void setup() {
+  Serial.begin(9600);
+}
+
+// A loop that changes the addres to the next one, and creates a value that is 2 larger 
+//than the previus address' value
+void loop(){
+  EEPROM.write(addr, val);
+  
+  val = val+2;
+  addr = addr+1;
+  
+}
