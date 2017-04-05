@@ -1,0 +1,62 @@
+
+// Counts number of button presses
+// output count to serial
+// blink a led according to count
+
+int button1 = 2;                      // Assuming button on pin 2
+int button2 = 3;                      // Assuming button on pin 3
+boolean flag = false;               
+int minutes=0;
+int hours=6; 
+
+
+void setup() {
+  pinMode(button1, INPUT);            // Button 1 is the "turn button"
+  digitalWrite(button1, HIGH);        // set pullup resistor
+  Serial.begin(9600);     
+  loop();            
+}
+
+void loop(){
+ test2();
+  }
+
+  
+  int test2(){
+    if (digitalRead(button1) == LOW)    // check if button was pressed
+  {
+  minutes++;
+  if(minutes == 60){
+    minutes = 0;
+    hours++;
+
+    }
+    flag=false;                      //Accessing print 
+  }  
+  if(flag == false){
+  Serial.print("Time");
+  Serial.print(" ");
+  Serial.print("0");  
+  Serial.print(hours);
+  Serial.print(":");
+  Serial.print(minutes);
+  Serial.print("0");
+  }
+  flag = true;                       //Reset flag 
+
+if(digitalRead(button2)==LOW)
+{
+  int h; int m;
+h=hours;
+m=minutes;
+int time[]={h,m};
+return time;
+
+    }
+  }
+  
+
+
+
+
+    
