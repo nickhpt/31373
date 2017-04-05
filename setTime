@@ -1,8 +1,4 @@
 
-// Counts number of button presses
-// output count to serial
-// blink a led according to count
-
 int button1 = 2;                      // Assuming button on pin 2
 int button2 = 3;                      // Assuming button on pin 3
 boolean flag = false;               
