@@ -28,5 +28,9 @@ void loop(){
   // Uses the loop to display the value of the given address
   addr = addr+1;
   value = EEPROM.read(addr);
-  delay(200);
-}
+
+  delay(250);
+  while(addr==3){
+  }  
+  }
+  
