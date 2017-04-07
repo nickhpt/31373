@@ -1,0 +1,47 @@
+// Include relevant library
+#include <EEPROM.h>
+
+  int runner = 0;
+  int value;
+
+// Initialisation
+void setup() {
+  Serial.begin(9600);
+}
+
+///////////////////////////////
+// To make it print the given values, for confirming code is working.
+void loop() {
+  // put your main code here, to run repeatedly:
+  if(runner==0){
+
+  Time(4,10,28,9);
+  
+  Time(5,1,00,2);
+
+  
+  for (int i=0; i <= 25; i++){
+    value = EEPROM.read(i);
+    Serial.print(i);
+    Serial.print("\t");
+    Serial.print(value, DEC);
+    Serial.println();
+  }
+  runner = 1;
+}
+}
+////////////////////////////////////
+
+/////////////////////////////////////////////////
+// The important main-function
+void Time(uint8_t wd,uint8_t hr,uint8_t mi,uint8_t pos){
+  uint8_t addr = 3; //The adress from which we are allowed to write. (Because the adresses before are reserved to motor position)
+  uint8_t x = EEPROM.read(addr+1); // Write the number of saved positions to the first available adress
+  uint8_t addrn = addr+2+x*4; //The andress number, from which the positions will be saved to. Adds x*4 every time to avoid overwriting older data. 
+  EEPROM.write(addrn,wd); //Write the weekday (1-8)
+  EEPROM.write(addrn+1,hr); //Write the hour (0-23)
+  EEPROM.write(addrn+2,mi); //Write the minute (0-59)
+  EEPROM.write(addrn+3,pos); //Write to position (1-10)
+
+  EEPROM.write(addr+1,x+1); //Adds one to the number of adresses saved, så they wont be overwritten. 
+ }
