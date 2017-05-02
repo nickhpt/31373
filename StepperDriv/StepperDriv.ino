@@ -13,6 +13,20 @@ LiquidCrystal lcd(11, 9, 3, 2, 1, 0);
 
 DS1307 clock;//define a object of DS1307 class aka. RTC
 
+struct timeStruct{
+  uint8_t wd;
+  uint8_t hr;
+  uint8_t mi;
+  uint8_t pos;
+  };
+
+//The main alarms
+timeStruct alarms[10];
+
+// the Timestruct used for simplicity in menus.
+timeStruct menuTime; 
+
+
 // For basic motor Control
 int currMotPos = 0; // the current position of the motor
 int motPos = 0; // The wanted position of the motor
@@ -29,13 +43,20 @@ int buttonVals[3]= {289,509, 1020}; // The values that correlate to different Bu
 
 //For All Menus
 int currMenu = 0; //Each number correlates to different Menus, as seen in the following array. 
-String menuNames[4] = {"main", "move","Set Positions ","Set Time"};
+String menuNames[4] = {"main", "Set Alarm","Set Positions ","Set Time"};
 
 //For Main Menu
 uint8_t highMenu = 0; //currently highlighted Menu Option
 
-//For Calibrating menu
-uint8_t calibrating = 0; //which value is currently being calibrated? 0 if none, 1 = val 0 etc.
+//For Set Alarm Menu
+uint8_t settingA = 0; //is an alarm currently being set? 0 if none, 1 = val 0 etc.
+
+//For Calibrating Menu
+uint8_t calibrating = 0; //is positions currently being calibrated? 0 if none, 1 = val 0 etc.
+
+//For Set Time Menu
+uint8_t timeSet = 0; // Setting: 0 = hour, 1 = minute, 2 = weekday.
+uint8_t timeSetValue = 0;
 
 
 /*
@@ -45,9 +66,11 @@ uint8_t calibrating = 0; //which value is currently being calibrated? 0 if none,
  * 
  * adr. 2->22  : calPositions. (as they are longer than a byte)
  * 
- * adr. 20 -> ?? : alarms and motorPositions
+ * adr. 40 -> ?? : alarms and motorPositions
  * 
  */
+
+int alarmAddr = 40;
 
 
 
@@ -72,6 +95,8 @@ void setup() {
   }else{
     loadCalibration();
   }
+
+  loadAlarms();
 }
 
 
@@ -84,7 +109,7 @@ void loop() {
   //lcd.setCursor(0, 1);
   // print the number of seconds since reset:
   //lcd.print(millis()/1000);
- 
+  AlarmUpdate();
   MotorUpdate();
   
   //printTime();
@@ -96,8 +121,16 @@ void loop() {
       MainMenu();
     break;
 
+    case 1: 
+      SetAlarmMenu();
+    break;
+    
     case 2: 
       CalibrationMenu();
+    break;
+
+    case 3:
+      SetTimeMenu();
     break;
   }
   delay(10);
@@ -127,8 +160,9 @@ void MainMenu(){ // The controller for the main Menu
 
     case 3: 
       lcd.clear();
-      currMenu = highMenu-1;
+      currMenu = highMenu+1;
       highMenu = 0;
+      return;
     break;
   }
   
@@ -139,6 +173,120 @@ void MainMenu(){ // The controller for the main Menu
   
 }
 
+/*
+ * Set alarm Menu
+ */
+
+void SetAlarmMenu(){
+if(calibrating == 0){
+   //If user haven't selected a slot yet
+    lcd.setCursor(4,0);
+    lcd.print("Select Slot");
+    
+    lcd.setCursor(1,3);
+    lcd.print("back");
+
+    for(int q = 0; q < 10; q++){
+      lcd.setCursor((q*2),1);
+      lcd.print(" ");
+      lcd.setCursor((q*2)+1,1);
+      lcd.print(q);
+    }
+
+    if (highMenu == 0){
+      lcd.setCursor(0,3);
+      lcd.print(">");
+
+      if(checkButtonDown() == 3){
+        lcd.clear();
+        currMenu = 0;
+      }
+      
+    }else{
+      lcd.setCursor(0,3);
+      lcd.print(" ");
+
+      lcd.setCursor((highMenu - 1)*2, 1);
+      lcd.print(">");
+
+      switch(checkButtonDown()){
+        case 1:
+          highMenu --;
+        break;
+        case 2: 
+          highMenu ++;
+        break;
+        case 3: 
+         calibrating = 1; 
+        break;
+      }
+      
+    }
+  }else{
+    if(timeSet == 4){
+      saveAlarms(alarms[highMenu],highMenu);
+      lcd.clear();
+      currMenu = 0;
+      highMenu = 0;
+      return;
+    }
+  
+    lcd.clear();
+    lcd.setCursor(1,2);
+    lcd.print("<");
+    lcd.setCursor(1,17);
+    lcd.print(">");
+
+    switch(timeSet){
+      case 0:
+        timeSetValue %= 24;
+        lcd.setCursor(1,8);
+        lcd.print("hour");
+        lcd.setCursor(2,9);
+        lcd.print(timeSetValue);
+        alarms[highMenu].hr = timeSetValue;
+      break;
+      case 1:
+        timeSetValue %= 60;
+        lcd.setCursor(1,7);
+        lcd.print("minute");
+        lcd.setCursor(2,9);
+        lcd.print(timeSetValue);
+        alarms[highMenu].mi = timeSetValue;
+      break;
+      case 2:
+        timeSetValue %= 8;
+        lcd.setCursor(1,9);
+        lcd.print("day");
+        lcd.setCursor(2,9);
+        lcd.print(dayOfWeek(timeSetValue));
+        alarms[highMenu].wd = timeSetValue;
+      break;
+      case 3:
+        timeSetValue %= 10;
+        lcd.setCursor(1,9);
+        lcd.print("position");
+        lcd.setCursor(2,9);
+        lcd.print(timeSetValue);
+        alarms[highMenu].pos = timeSetValue;
+      break;
+    }
+  
+    switch(checkButtonDown()){
+        case 1:
+          timeSetValue --;
+        break;
+        case 2: 
+          timeSetValue ++;
+        break;
+        case 3: 
+          timeSet ++;
+          timeSetValue = 0;
+          lcd.clear();
+        break;
+      }
+  }
+}
 
 /*
  * This function control the calibration of the motor-arduino combo
@@ -160,7 +308,7 @@ void CalibrationMenu(){
       lcd.print(q);
     }
 
-    if (highMenu < 1){
+    if (highMenu == 0){
       lcd.setCursor(0,3);
       lcd.print(">");
 
@@ -171,6 +319,7 @@ void CalibrationMenu(){
       }
       
     }else{
+    
       lcd.setCursor(0,3);
       lcd.print(" ");
 
@@ -217,13 +366,78 @@ void CalibrationMenu(){
           motPos += stepsPTick;
         break;
         case 3: 
-          calPositions[highMenu-1] = currMotPos 
+          calPositions[highMenu-1] = currMotPos;
           calibrating = 0;
           lcd.clear();
         break;
       }
     }
   }
+    
+}
+
+
+/*
+ * SetTime Menu
+ */
+
+void SetTimeMenu(){
+if(timeSet == 3){
+  lcd.clear();
+  clock.fillByHMS(menuTime.hr,menuTime.mi,30);
+  clock.fillDayOfWeek(menuTime.wd);
+  clock.setTime();
+  currMenu = 0;
+  highMenu = 0;
+  return;
+}
+  
+  lcd.clear();
+  lcd.setCursor(1,2);
+  lcd.print("<");
+  lcd.setCursor(1,17);
+  lcd.print(">");
+
+  switch(timeSet){
+    case 0:
+      timeSetValue %= 24;
+      lcd.setCursor(1,8);
+      lcd.print("hour");
+      lcd.setCursor(2,9);
+      lcd.print(timeSetValue);
+      menuTime.hr = timeSetValue;
+    break;
+    case 1:
+      timeSetValue %= 60;
+      lcd.setCursor(1,7);
+      lcd.print("minute");
+      lcd.setCursor(2,9);
+      lcd.print(timeSetValue);
+      menuTime.mi = timeSetValue;
+    break;
+    case 2:
+      timeSetValue %= 8;
+      lcd.setCursor(1,9);
+      lcd.print("day");
+      lcd.setCursor(2,9);
+      lcd.print(dayOfWeek(timeSetValue));
+      menuTime.wd = timeSetValue;
+    break;
+  }
+  
+  switch(checkButtonDown()){
+        case 1:
+          timeSetValue --;
+        break;
+        case 2: 
+          timeSetValue ++;
+        break;
+        case 3: 
+          timeSet ++;
+          timeSetValue = 0;
+          lcd.clear();
+        break;
+      }
 }
 
 
@@ -235,10 +449,10 @@ void CalibrationMenu(){
 void saveCalibration (){ 
   for(int e = 0; e < 10; e ++){
     byte saveByte1 = calPositions[e] >> 8;
-    byte saveByte2 = lowbyte(calPositions[e]);
+    byte saveByte2 = lowByte(calPositions[e]);
 
     EEPROM.write(e*2+2, saveByte1);
-    EEPROM.write(e*2+3, saveByte3);
+    EEPROM.write(e*2+3, saveByte2);
   }
 }
 
@@ -277,6 +491,10 @@ int checkButtonDown(){ //When a button press is detected, this value changes to 
 }
 
 
+void AlarmUpdate(){
+  if
+  }
+
 
 
 void MotorUpdate(){ //This updates the motor each tick, to match with the motPos value.
@@ -299,7 +517,28 @@ void MotorUpdate(){ //This updates the motor each tick, to match with the motPos
 }
 
 
+void saveAlarms(timeStruct ts, int addr){
+  uint8_t addrn = addr+2*4 + alarmAddr; //The andress number, from which the positions will be saved to. Adds x*4 every time to avoid overwriting older data. 
+  EEPROM.write(addrn,ts.wd); //Write the weekday (0-8)
+  EEPROM.write(addrn+1,ts.hr); //Write the hour (0-23)
+  EEPROM.write(addrn+2,ts.mi); //Write the minute (0-59)
+  EEPROM.write(addrn+3,ts.pos); //Write to position (0-9)
 
+  EEPROM.write(addrn+1,addr+1); //Adds one to the number of adresses saved, så they wont be overwritten. 
+}
+
+void loadAlarms(){
+
+  for(int i = 0; i < 10; i++){
+      uint8_t addrn = addr+2*4 + alarmAddr; //The andress number, from which the positions will be loaded from. 
+      alarms[i].wd  = EEPROM.read(addrn;    //read the weekday (0-8)
+      alarms[i].hr  = EEPROM.read(addrn+1); //read the hour (0-23)
+      alarms[i].mi  = EEPROM.read(addrn+2); //read the minute (0-59)
+      alarms[i].pos = EEPROM.read(addrn+3); //read to position (0-9)
+
+    }
+
+}
 
 void printTime()
 {
@@ -307,14 +546,38 @@ void printTime()
   lcd.setCursor(0,3);
 	lcd.print(clock.hour, DEC);
 	lcd.print(":");
-	lcd.print(clock.minute, DEC);
-	lcd.print(":");
-	lcd.print(clock.second, DEC);
-	lcd.print(" ");
-	lcd.print(clock.month, DEC);
-	lcd.print("/");
-	lcd.print(clock.dayOfMonth, DEC);
-	lcd.print("/");
-	lcd.print(clock.year+2000, DEC);
+	lcd.print(clock.minute, DEC); 
 
+  lcd.print(" ");
+  lcd.print(clock.dayOfWeek);
+}
+
+String dayOfWeek(int wd){
+  switch(wd){
+    case 0:
+      return "all";
+    break;
+    case 1:
+      return "MON";
+    break;
+    case 2:
+      return "TUE";
+    break;
+    case 3:
+      return "WED";
+    break;
+    case 4:
+      return "THU";
+    break;
+    case 5:
+      return "FRI";
+    break;
+    case 6:
+      return "SAT";
+    break;
+    case 7:
+      return "SUN";
+    break;
+  }
+  return "error";
 }
