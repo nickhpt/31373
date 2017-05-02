@@ -43,10 +43,12 @@ int buttonVals[3]= {289,509, 1020}; // The values that correlate to different Bu
 
 //For All Menus
 int currMenu = 0; //Each number correlates to different Menus, as seen in the following array. 
-String menuNames[4] = {"main", "Set Alarm","Set Positions ","Set Time"};
+String menuNames[5] = {"main","Move to Position", "Set Alarm","Set Positions ","Set Time"};
 
 //For Main Menu
 uint8_t highMenu = 0; //currently highlighted Menu Option
+uint8_t highMenu2 = 0; //currently highlighted Menu Option (extra for validation menu)
+
 
 //For Set Alarm Menu
 uint8_t settingA = 0; //is an alarm currently being set? 0 if none, 1 = val 0 etc.
@@ -93,10 +95,10 @@ void setup() {
       highMenu = 1;
       calibrating = 1;
   }else{
-    loadCalibration();
+    LoadCalibration();
   }
 
-  loadAlarms();
+  LoadAlarms();
 }
 
 
@@ -112,7 +114,7 @@ void loop() {
   AlarmUpdate();
   MotorUpdate();
   
-  //printTime();
+  //PrintTime();
   
   lcd.setCursor(0,0);
   
@@ -122,14 +124,18 @@ void loop() {
     break;
 
     case 1: 
+      MoveToPosMenu();
+    break;
+
+    case 2: 
       SetAlarmMenu();
     break;
     
-    case 2: 
+    case 3: 
       CalibrationMenu();
     break;
 
-    case 3:
+    case 4:
       SetTimeMenu();
     break;
   }
@@ -138,14 +144,17 @@ void loop() {
 
 
 
+/*
+ * Main Menu Function
+ */
 
 
 void MainMenu(){ // The controller for the main Menu
-  for(int i = 0; i < 3; i++){
+  for(int i = 0; i < 4; i++){
     lcd.setCursor(1,i);
     lcd.print(menuNames[i+1]);
   }
-  switch(checkButtonDown()){
+  switch(CheckButtonDown()){
     case 1:
       lcd.setCursor(0,highMenu);
       lcd.print(" ");
@@ -174,6 +183,55 @@ void MainMenu(){ // The controller for the main Menu
 }
 
 /*
+ * Move To predefined Position Menu
+ */
+void MoveToPosMenu(){
+    lcd.setCursor(4,0);
+    lcd.print("Select  Slot");
+    
+    lcd.setCursor(1,3);
+    lcd.print("back");
+
+    for(int q = 0; q < 10; q++){
+      lcd.setCursor((q*2),1);
+      lcd.print(" ");
+      lcd.setCursor((q*2)+1,1);
+      lcd.print(q);
+    }
+
+    if (highMenu == 0){
+      lcd.setCursor(0,3);
+      lcd.print(">"); 
+    }else{
+      lcd.setCursor(0,3);
+      lcd.print(" ");
+      lcd.setCursor((highMenu - 1)*2, 1);
+      lcd.print(">");
+    }
+
+
+      switch(CheckButtonDown()){
+        case 1:
+          highMenu --;
+          highMenu %= 11;
+        break;
+        case 2: 
+          highMenu ++;
+          highMenu %= 11;
+        break;
+        case 3: 
+          if(highMenu == 0){
+            SaveCalibration();
+            lcd.clear();
+            currMenu = 0;
+            return;
+          }
+          motPos = calPositions[highMenu-1];
+        break; 
+      }
+}
+
+/*
  * Set alarm Menu
  */
 
@@ -196,83 +254,138 @@ if(calibrating == 0){
     if (highMenu == 0){
       lcd.setCursor(0,3);
       lcd.print(">");
-
-      if(checkButtonDown() == 3){
-        lcd.clear();
-        currMenu = 0;
-      }
       
     }else{
       lcd.setCursor(0,3);
       lcd.print(" ");
-
       lcd.setCursor((highMenu - 1)*2, 1);
       lcd.print(">");
+    }
 
-      switch(checkButtonDown()){
+      switch(CheckButtonDown()){
         case 1:
           highMenu --;
+          highMenu %= 11;
         break;
         case 2: 
           highMenu ++;
+          highMenu %= 11;
         break;
         case 3: 
-         calibrating = 1; 
+         
+          if(highMenu == 0){
+            lcd.clear();
+            currMenu = 0;
+            return;
+           }
+        calibrating = 1;
+        lcd.clear();
         break;
       }
       
-    }
-  }else{
+    
+  }else if(calibrating == 1){
+      lcd.setCursor(3,0);
+      if(alarms[highMenu-1].hr < 10){
+        lcd.print("0");
+      }
+      lcd.print(alarms[highMenu-1].hr,DEC);
+      lcd.print(":"); 
+      if(alarms[highMenu-1].hr < 10){
+        lcd.print("0");
+      }
+      lcd.print(alarms[highMenu-1].mi,DEC);
+      lcd.print(" "+DayOfWeek(alarms[highMenu-1].wd)); 
+      lcd.print(", Pos ");
+      lcd.print(alarms[highMenu-1].pos,DEC);
+      lcd.setCursor(1,2);
+      lcd.print("edit");
+      lcd.setCursor(1,3);
+      lcd.print("back");
+      highMenu2 %= 2;
+    
+      if(highMenu2 == 0){
+        lcd.setCursor(0,2);
+        lcd.print(">");
+        lcd.setCursor(0,3);
+        lcd.print(" ");
+      }else{
+        lcd.setCursor(0,2);
+        lcd.print(" ");
+        lcd.setCursor(0,3);
+        lcd.print(">");
+      }
+
+      switch(CheckButtonDown()){
+          case 1:
+            highMenu2 --;
+          break;
+          case 2: 
+            highMenu2 ++;
+          break;
+          case 3: 
+            if(highMenu2 == 0){
+              calibrating = 2;
+            }else{
+              calibrating = 0;
+              highMenu2 = 0;
+            }
+            lcd.clear();
+          break;
+        }
+  }else if(calibrating == 2){
     if(timeSet == 4){
-      saveAlarms(alarms[highMenu],highMenu);
+      SaveAlarms();
       lcd.clear();
+      calibrating = 0;
+      timeSet = 0;
       currMenu = 0;
       highMenu = 0;
       return;
     }
   
     lcd.clear();
-    lcd.setCursor(1,2);
+    lcd.setCursor(2,1);
     lcd.print("<");
-    lcd.setCursor(1,17);
+    lcd.setCursor(17,1);
     lcd.print(">");
 
     switch(timeSet){
       case 0:
         timeSetValue %= 24;
-        lcd.setCursor(1,8);
+        lcd.setCursor(8,1);
         lcd.print("hour");
-        lcd.setCursor(2,9);
+        lcd.setCursor(9,2);
         lcd.print(timeSetValue);
-        alarms[highMenu].hr = timeSetValue;
+        alarms[highMenu-1].hr = timeSetValue;
       break;
       case 1:
         timeSetValue %= 60;
-        lcd.setCursor(1,7);
+        lcd.setCursor(7,1);
         lcd.print("minute");
-        lcd.setCursor(2,9);
+        lcd.setCursor(9,2);
         lcd.print(timeSetValue);
-        alarms[highMenu].mi = timeSetValue;
+        alarms[highMenu-1].mi = timeSetValue;
       break;
       case 2:
         timeSetValue %= 8;
-        lcd.setCursor(1,9);
+        lcd.setCursor(9,1);
         lcd.print("day");
-        lcd.setCursor(2,9);
-        lcd.print(dayOfWeek(timeSetValue));
-        alarms[highMenu].wd = timeSetValue;
+        lcd.setCursor(9,2);
+        lcd.print(DayOfWeek(timeSetValue));
+        alarms[highMenu-1].wd = timeSetValue;
       break;
       case 3:
         timeSetValue %= 10;
-        lcd.setCursor(1,9);
+        lcd.setCursor(9,1);
         lcd.print("position");
-        lcd.setCursor(2,9);
+        lcd.setCursor(9,2);
         lcd.print(timeSetValue);
-        alarms[highMenu].pos = timeSetValue;
+        alarms[highMenu-1].pos = timeSetValue;
       break;
     }
   
-    switch(checkButtonDown()){
+    switch(CheckButtonDown()){
         case 1:
           timeSetValue --;
         break;
@@ -296,7 +409,7 @@ void CalibrationMenu(){
   if(calibrating == 0){
    //If user haven't selected a slot yet
     lcd.setCursor(4,0);
-    lcd.print("Select Slot");
+    lcd.print("Select  Slot");
     
     lcd.setCursor(1,3);
     lcd.print("back");
@@ -312,64 +425,74 @@ void CalibrationMenu(){
       lcd.setCursor(0,3);
       lcd.print(">");
 
-      if(checkButtonDown() == 3){
-        saveCalibration();
-        lcd.clear();
-        currMenu = 0;
-      }
       
     }else{
     
       lcd.setCursor(0,3);
       lcd.print(" ");
-
       lcd.setCursor((highMenu - 1)*2, 1);
       lcd.print(">");
+    }
 
-      switch(checkButtonDown()){
+
+      switch(CheckButtonDown()){
         case 1:
           highMenu --;
+          highMenu %= 11;
         break;
         case 2: 
           highMenu ++;
+          highMenu %= 11;
         break;
         case 3: 
-         calibrating = 1; 
+        if(highMenu == 0){
+           SaveCalibration();
+           lcd.clear();
+           currMenu = 0;
+           return;
+         }
+         lcd.clear();
+         calibrating = 1;
+         return;
         break;
       }
       
-    }
+    
   }else{
+    lcd.clear();
     lcd.setCursor(1,2);
     lcd.print("Press L/R to move");
+    lcd.setCursor(10,1);
+    lcd.print(highMenu-1);
     if(highMenu == 1){
-      switch(checkButtonDown()){
+      switch(CheckButton()){
         case 1:
           motPos -= stepsPTick;
         break;
         case 2: 
           motPos += stepsPTick;
         break;
-        case 3: 
+      }
+      if(CheckButtonDown() == 3){
           currMotPos = 0;
           motPos = 0;
           calibrating = 0;
           lcd.clear();
-        break;
       }
     }else{
-      switch(checkButtonDown()){
+      switch(CheckButton()){
         case 1:
           motPos -= stepsPTick;
         break;
         case 2: 
           motPos += stepsPTick;
         break;
-        case 3: 
+      }
+      
+      if(CheckButtonDown() == 3){
           calPositions[highMenu-1] = currMotPos;
           calibrating = 0;
           lcd.clear();
-        break;
       }
     }
   }
@@ -382,62 +505,103 @@ void CalibrationMenu(){
  */
 
 void SetTimeMenu(){
-if(timeSet == 3){
-  lcd.clear();
-  clock.fillByHMS(menuTime.hr,menuTime.mi,30);
-  clock.fillDayOfWeek(menuTime.wd);
-  clock.setTime();
-  currMenu = 0;
-  highMenu = 0;
-  return;
-}
-  
-  lcd.clear();
-  lcd.setCursor(1,2);
-  lcd.print("<");
-  lcd.setCursor(1,17);
-  lcd.print(">");
-
-  switch(timeSet){
-    case 0:
-      timeSetValue %= 24;
-      lcd.setCursor(1,8);
-      lcd.print("hour");
-      lcd.setCursor(2,9);
-      lcd.print(timeSetValue);
-      menuTime.hr = timeSetValue;
-    break;
-    case 1:
-      timeSetValue %= 60;
-      lcd.setCursor(1,7);
-      lcd.print("minute");
-      lcd.setCursor(2,9);
-      lcd.print(timeSetValue);
-      menuTime.mi = timeSetValue;
-    break;
-    case 2:
-      timeSetValue %= 8;
-      lcd.setCursor(1,9);
-      lcd.print("day");
-      lcd.setCursor(2,9);
-      lcd.print(dayOfWeek(timeSetValue));
-      menuTime.wd = timeSetValue;
-    break;
+if(calibrating == 1){
+  if(timeSet == 3){
+    lcd.clear();
+    clock.fillByHMS(menuTime.hr,menuTime.mi,30);
+    clock.fillDayOfWeek(menuTime.wd);
+    clock.setTime();
+    calibrating = 0;
+    currMenu = 0;
+    timeSet = 0;
+    highMenu = 0;
+    return;
   }
   
-  switch(checkButtonDown()){
-        case 1:
-          timeSetValue --;
-        break;
-        case 2: 
-          timeSetValue ++;
-        break;
-        case 3: 
-          timeSet ++;
-          timeSetValue = 0;
-          lcd.clear();
-        break;
-      }
+    lcd.clear();
+    lcd.setCursor(2,1);
+    lcd.print("<");
+    lcd.setCursor(17,1);
+    lcd.print(">");
+
+    switch(timeSet){
+      case 0:
+        timeSetValue %= 24;
+        lcd.setCursor(8,1);
+        lcd.print("hour");
+        lcd.setCursor(9,2);
+        lcd.print(timeSetValue);
+        menuTime.hr = timeSetValue;
+      break;
+      case 1:
+        timeSetValue %= 60;
+        lcd.setCursor(7,1);
+        lcd.print("minute");
+        lcd.setCursor(9,2);
+        lcd.print(timeSetValue);
+        menuTime.mi = timeSetValue;
+      break;
+      case 2:
+        timeSetValue %= 8;
+        lcd.setCursor(9,1);
+        lcd.print("day");
+        lcd.setCursor(9,1);
+        lcd.print(DayOfWeek(timeSetValue));
+        menuTime.wd = timeSetValue;
+      break;
+    }
+  
+    switch(CheckButtonDown()){
+          case 1:
+            timeSetValue --;
+          break;
+          case 2: 
+            timeSetValue ++;
+          break;
+          case 3: 
+            timeSet ++;
+            timeSetValue = 0;
+            lcd.clear();
+          break;
+        }
+  }else{
+    PrintTime(3, 0);
+    lcd.setCursor(1,2);
+    lcd.print("edit");
+    lcd.setCursor(1,3);
+    lcd.print("back");
+    highMenu2 %= 2;
+    
+    if(highMenu2 == 0){
+      lcd.setCursor(0,2);
+      lcd.print(">");
+      lcd.setCursor(0,3);
+      lcd.print(" ");
+    }else{
+      lcd.setCursor(0,2);
+      lcd.print(" ");
+      lcd.setCursor(0,3);
+      lcd.print(">");
+    }
+
+    switch(CheckButtonDown()){
+          case 1:
+            highMenu2 --;
+          break;
+          case 2: 
+            highMenu2 ++;
+          break;
+          case 3: 
+            if(highMenu2 == 0){
+              calibrating = 1;
+            }else{
+              currMenu = 0;
+            }
+            highMenu2 = 0;
+            lcd.clear();
+          break;
+        }
+  }
 }
 
 
@@ -446,18 +610,19 @@ if(timeSet == 3){
  * These functions save and load the motor calibrations 
  */
 
-void saveCalibration (){ 
+void SaveCalibration (){ 
   for(int e = 0; e < 10; e ++){
     byte saveByte1 = calPositions[e] >> 8;
     byte saveByte2 = lowByte(calPositions[e]);
 
     EEPROM.write(e*2+2, saveByte1);
     EEPROM.write(e*2+3, saveByte2);
+    EEPROM.write(1, 111);
   }
 }
 
 
-void loadCalibration (){
+void LoadCalibration (){
   for(int e = 0; e < 10; e ++){
     calPositions[e] = EEPROM.read(e*2+2) << 8;
     calPositions[e] += EEPROM.read(e*2+3);
@@ -468,7 +633,7 @@ void loadCalibration (){
 /*
  * These functions check whether or not the keys have been pressed.
  */
-int checkButton(){ //When a button press is detected, this value changes to said button
+int CheckButton(){ //When a button press is detected, this value changes to said button
     for(int q = 0; q < numOfButtons; q ++){
       if(analogRead(input1) >= buttonVals[q] -30 && analogRead(input1) <= buttonVals[q] +30){
         return q+1;
@@ -480,10 +645,10 @@ int checkButton(){ //When a button press is detected, this value changes to said
 
 
 
-int checkButtonDown(){ //When a button press is detected, this value changes to said button for 1 tick
-  if(lastButton !=checkButton()){
-    lastButton = checkButton();
-    return checkButton();
+int CheckButtonDown(){ //When a button press is detected, this value changes to said button for 1 tick
+  if(lastButton !=CheckButton()){
+    lastButton = CheckButton();
+    return CheckButton();
   }else {
    return 0; 
   }
@@ -491,10 +656,22 @@ int checkButtonDown(){ //When a button press is detected, this value changes to 
 }
 
 
-void AlarmUpdate(){
-  if
-  }
 
+void AlarmUpdate(){
+  clock.getTime();
+
+  for (int i = 0; i < 10; i++){
+    if(clock.hour == alarms[i].hr && clock.minute == alarms[i].mi){
+      if(alarms[i].wd == 0 || alarms[i].wd == clock.dayOfWeek){
+        if(alarms[i].hr == 0 && alarms[i].mi == 0 && alarms[i].wd == 0 && alarms[i].pos == 0){
+          return;
+        }
+        motPos = calPositions[alarms[i].pos];
+      }
+    }
+  }
+  
+}
 
 
 void MotorUpdate(){ //This updates the motor each tick, to match with the motPos value.
@@ -517,21 +694,21 @@ void MotorUpdate(){ //This updates the motor each tick, to match with the motPos
 }
 
 
-void saveAlarms(timeStruct ts, int addr){
-  uint8_t addrn = addr+2*4 + alarmAddr; //The andress number, from which the positions will be saved to. Adds x*4 every time to avoid overwriting older data. 
-  EEPROM.write(addrn,ts.wd); //Write the weekday (0-8)
-  EEPROM.write(addrn+1,ts.hr); //Write the hour (0-23)
-  EEPROM.write(addrn+2,ts.mi); //Write the minute (0-59)
-  EEPROM.write(addrn+3,ts.pos); //Write to position (0-9)
-
-  EEPROM.write(addrn+1,addr+1); //Adds one to the number of adresses saved, så they wont be overwritten. 
+void SaveAlarms(){
+    for(int i = 0; i < 10; i++){
+      int addrn = i*4 + alarmAddr; //The andress number, from which the positions will be loaded from. 
+      EEPROM.write(addrn,alarms[i].wd); //Write the weekday (0-8)
+      EEPROM.write(addrn+1,alarms[i].hr); //Write the hour (0-23)
+      EEPROM.write(addrn+2,alarms[i].mi); //Write the minute (0-59)
+      EEPROM.write(addrn+3,alarms[i].pos); //Write to position (0-9)
+    }
 }
 
-void loadAlarms(){
+void LoadAlarms(){
 
   for(int i = 0; i < 10; i++){
-      uint8_t addrn = addr+2*4 + alarmAddr; //The andress number, from which the positions will be loaded from. 
-      alarms[i].wd  = EEPROM.read(addrn;    //read the weekday (0-8)
+      int addrn = i*4+ alarmAddr; //The andress number, from which the positions will be loaded from. 
+      alarms[i].wd  = EEPROM.read(addrn);    //read the weekday (0-8)
       alarms[i].hr  = EEPROM.read(addrn+1); //read the hour (0-23)
       alarms[i].mi  = EEPROM.read(addrn+2); //read the minute (0-59)
       alarms[i].pos = EEPROM.read(addrn+3); //read to position (0-9)
@@ -540,19 +717,19 @@ void loadAlarms(){
 
 }
 
-void printTime()
+void PrintTime(int x, int y)
 {
 	clock.getTime();
-  lcd.setCursor(0,3);
+  lcd.setCursor(x,y);
 	lcd.print(clock.hour, DEC);
 	lcd.print(":");
 	lcd.print(clock.minute, DEC); 
 
   lcd.print(" ");
-  lcd.print(clock.dayOfWeek);
+  lcd.print(DayOfWeek(clock.dayOfWeek));
 }
 
-String dayOfWeek(int wd){
+String DayOfWeek(int wd){
   switch(wd){
     case 0:
       return "all";
